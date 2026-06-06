@@ -1,10 +1,12 @@
 import RPi.GPIO as GPIO
+import threading
 import time
 import sys
 
 
 leds = [4, 17, 18, 27, 22, 23, 24, 25, 7]
 type_list = ["ladder", "snake", "ping_pong", "static", "reverse_blink", "blink"]
+flags = ["time", "len", "type", "quantity"]
 
 GPIO.setmode(GPIO.BCM)
 
@@ -16,18 +18,22 @@ def init_GPIO():
         GPIO.output(pin, 0)
 
 
-def ladder_LED(time_out: float):
+def ladder_LED(time_out: float, stop_event):
     init_GPIO()
 
     try:
-        while True:
+        while not stop_event.is_set():
             for pin in leds:
                 GPIO.output(pin, True)
-                time.sleep(time_out)
+
+                if stop_event.wait(time_out):
+                    break
 
             for pin in reversed(leds):
                 GPIO.output(pin, False)
-                time.sleep(time_out)
+
+                if stop_event.wait(time_out):
+                    break
 
     except KeyboardInterrupt:
         pass
@@ -36,24 +42,30 @@ def ladder_LED(time_out: float):
         GPIO.cleanup()
 
 
-def snake_LED(time_out: float, lens: int):
+def snake_LED(time_out: float, lens: int, stop_event):
     init_GPIO()
 
     try:
         for ind in range(lens):
             GPIO.output(leds[ind], True)
-            time.sleep(time_out)
+
+            if stop_event.wait(time_out):
+                break
 
         ind = lens % len(leds)
         len_leds = len(leds)
 
-        while True:
+        while not stop_event.is_set():
             GPIO.output(leds[ind], True)
+
             off_ind = (ind - lens) % len_leds
             GPIO.output(leds[off_ind], False)
+
             ind = (ind + 1) % len_leds
-            time.sleep(time_out)
-    
+
+            if stop_event.wait(time_out):
+                break
+
     except KeyboardInterrupt:
         pass
 
@@ -61,40 +73,48 @@ def snake_LED(time_out: float, lens: int):
         GPIO.cleanup()
 
 
-def ping_pong_LED(time_out: float, lens: int):
+def ping_pong_LED(time_out: float, lens: int, stop_event):
     init_GPIO()
 
     try:
         for ind in range(lens):
             GPIO.output(leds[ind], True)
-        
-        time.sleep(time_out)
+
+        if stop_event.wait(time_out):
+            return
 
         first_ind = lens
         len_leds = len(leds)
         last_ind = 0
 
-        while True:
+        while not stop_event.is_set():
+
             while first_ind < len_leds:
                 GPIO.output(leds[first_ind], True)
                 GPIO.output(leds[last_ind], False)
-                time.sleep(time_out)
+
+                if stop_event.wait(time_out):
+                    break
+
                 first_ind += 1
                 last_ind += 1
-            
+
             first_ind -= 1
             last_ind -= 1
 
             while last_ind >= 0:
                 GPIO.output(leds[first_ind], False)
                 GPIO.output(leds[last_ind], True)
-                time.sleep(time_out)
+
+                if stop_event.wait(time_out):
+                    break
+
                 first_ind -= 1
                 last_ind -= 1
-            
+
             first_ind += 1
             last_ind += 1
-    
+
     except KeyboardInterrupt:
         pass
 
@@ -102,16 +122,15 @@ def ping_pong_LED(time_out: float, lens: int):
         GPIO.cleanup()
 
 
-def static_LED():
+def static_LED(stop_event):
     init_GPIO()
 
     try:
         for pin in leds:
             GPIO.output(pin, True)
-        
-        while True:
-            time.sleep(10)
-    
+
+        stop_event.wait()
+
     except KeyboardInterrupt:
         pass
 
@@ -119,27 +138,36 @@ def static_LED():
         GPIO.cleanup()
 
 
-def reverse_blink_LED(time_out: float, quantity: int):
+def reverse_blink_LED(time_out: float, quantity: int, stop_event):
     init_GPIO()
 
     try:
+        while not stop_event.is_set():
 
-        while True:
             for pin in leds:
                 GPIO.output(pin, True)
-            
+
             for pin in reversed(leds):
-                for _ in range(quantity):
 
+                for _ in range(quantity):
                     GPIO.output(pin, False)
-                    time.sleep(time_out)
+
+                    if stop_event.wait(time_out):
+                        break
 
                     GPIO.output(pin, True)
-                    time.sleep(time_out)
-                
+
+                    if stop_event.wait(time_out):
+                        break
+
+                if stop_event.is_set():
+                    break
+
                 GPIO.output(pin, False)
-                time.sleep(time_out)
-    
+
+                if stop_event.wait(time_out):
+                    break
+
     except KeyboardInterrupt:
         pass
 
@@ -147,48 +175,60 @@ def reverse_blink_LED(time_out: float, quantity: int):
         GPIO.cleanup()
 
 
-def blink_LED(time_out: float, quantity: int):
+def blink_LED(time_out: float, quantity: int, stop_event):
     init_GPIO()
 
     try:
+        while not stop_event.is_set():
 
-        while True:
             for pin in leds:
                 GPIO.output(pin, False)
-            
+
             for pin in leds:
+
                 for _ in range(quantity):
-                    
                     GPIO.output(pin, True)
-                    time.sleep(time_out)
+
+                    if stop_event.wait(time_out):
+                        break
 
                     GPIO.output(pin, False)
-                    time.sleep(time_out)
-                
+
+                    if stop_event.wait(time_out):
+                        break
+
+                if stop_event.is_set():
+                    break
+
                 GPIO.output(pin, True)
-                time.sleep(time_out)
-    
+
+                if stop_event.wait(time_out):
+                    break
+
     except KeyboardInterrupt:
         pass
 
     finally:
-        GPIO.cleanup()   
+        GPIO.cleanup()
     
 
-def LED_logic(type_LED: str, time_out: float, lens: int, quantity: int):
+def LED_logic(type_LED: str, time_out: float, lens: int, quantity: int, stop_event=None):
+    if stop_event is None:
+        stop_event = threading.Event()
+
     match type_LED:
         case "ladder":
-            ladder_LED(time_out)
+            ladder_LED(time_out, stop_event)
         case "snake":
-            snake_LED(time_out, lens)
+            snake_LED(time_out, lens, stop_event)
         case "ping_pong":
-            ping_pong_LED(time_out, lens)
+            ping_pong_LED(time_out, lens, stop_event)
         case "static":
-            static_LED()
+            static_LED(stop_event)
         case "reverse_blink":
-            reverse_blink_LED(time_out, quantity)
+            reverse_blink_LED(time_out, quantity, stop_event)
         case "blink":
-            blink_LED(time_out, quantity)
+            blink_LED(time_out, quantity, stop_event)
 
 
 
