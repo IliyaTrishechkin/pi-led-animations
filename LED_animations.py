@@ -4,6 +4,8 @@ import time
 import sys
 
 
+BUTTON_PIN = 14
+
 leds = [4, 17, 18, 27, 22, 23, 24, 25, 7]
 type_list = ["ladder", "snake", "ping_pong", "static", "reverse_blink", "blink"]
 flags = ["time", "len", "type", "quantity"]
@@ -259,6 +261,7 @@ def main():
     time_out = 0.5
     lens = 1
     type_LED = "ladder"
+    current_mode = 0
     quantity = 5
     ind = 1 
     
@@ -297,6 +300,9 @@ def main():
                     if not type_LED in type_list:
                         print(f"Error: Unknown LED type '{type_LED}'. Available types are: {type_list}")
                         return
+                    
+                    current_mode = type_list.index(type_LED)
+                    
                 else:
                     return
             
@@ -324,8 +330,54 @@ def main():
         return
     
     print(f"Running with parameters: time_out={time_out}, lens={lens}, quantity={quantity}, type_LED='{type_LED}'")
+
+
+    stop_event = threading.Event()
+
+    animation_thread = threading.Thread(
+        target=LED_logic,
+        args=(type_LED, time_out, lens, quantity, stop_event)
+    )
+
+    animation_thread.start()
+
+    GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+    last = GPIO.input(BUTTON_PIN)
+
+    try:
+        while True:
+            state = GPIO.input(BUTTON_PIN)
+
+            if last == 1 and state == 0:
+                stop_event.set()
+                animation_thread.join()
+
+                current_mode = (current_mode + 1) % len(type_list)
+
+                stop_event = threading.Event()
+                animation_thread = threading.Thread(
+                    target=LED_logic,
+                    args=(type_list[current_mode], time_out, lens, quantity, stop_event)
+                )
+
+                animation_thread.start()
+                GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)                
+
+            last = state
+            time.sleep(0.01)
+
+        
+
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        stop_event.set()
+        animation_thread.join()
+        GPIO.cleanup()
+
     
-    LED_logic(type_LED, time_out, lens, quantity)
 
 
 if __name__ == "__main__":
