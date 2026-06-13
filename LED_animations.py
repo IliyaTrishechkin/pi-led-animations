@@ -375,7 +375,7 @@ def main():
     finally:
         stop_event.set()
         animation_thread.join()
-        GPIO.cleanup()
+        #GPIO.cleanup()
 
     
 
