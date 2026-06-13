@@ -49,7 +49,7 @@ Please select an animation mode:
 
 def main_menu_kb():
     kb = [[InlineKeyboardButton(i, callback_data=f"LED_mode|{i}")] for i in type_list]
-    kb.append([InlineKeyboardButton("Stop animation", "action|stop")])
+    kb.append([InlineKeyboardButton("Stop animation", callback_data="action|stop")])
     return kb
 
 
@@ -64,8 +64,8 @@ async def show_menu_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("Edit Time", callback_data="edit|time")],
         [InlineKeyboardButton("Edit Len", callback_data="edit|len")],
         [InlineKeyboardButton("Edit Quantity", callback_data="edit|quantity")],
-        [InlineKeyboardButton("Run code -->", "edit|run")],
-        [InlineKeyboardButton(" <-- Back", "action|back")]
+        [InlineKeyboardButton("Run code -->", callback_data="edit|run")],
+        [InlineKeyboardButton(" <-- Back", callback_data="action|back")]
     ]
 
     await update.message.reply_text(text_mes, reply_markup=InlineKeyboardMarkup(kb))
@@ -109,6 +109,7 @@ async def edit_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ClikButton(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global led_thread, stop_event
     q = update.callback_query
     await q.answer()
     cmd, arg = q.data.split("|")
@@ -127,8 +128,8 @@ async def ClikButton(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("Edit Time", callback_data="edit|time")],
                 [InlineKeyboardButton("Edit Len", callback_data="edit|len")],
                 [InlineKeyboardButton("Edit Quantity", callback_data="edit|quantity")],
-                [InlineKeyboardButton("Run code -->", "edit|run")],
-                [InlineKeyboardButton(" <-- Back", "action|back")]
+                [InlineKeyboardButton("Run code -->", callback_data="edit|run")],
+                [InlineKeyboardButton(" <-- Back", callback_data="action|back")]
             ]
 
             await q.edit_message_text(text_mes, reply_markup=InlineKeyboardMarkup(kb))
@@ -149,7 +150,6 @@ async def ClikButton(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return QUANTITY_EDIT
                 
                 case "run":
-                    global led_thread, stop_event
 
                     if led_thread and led_thread.is_alive():
                         stop_event.set()
@@ -164,7 +164,7 @@ async def ClikButton(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
 
                     led_thread.start()
-                    kb = [[InlineKeyboardButton(" <-- Back", "action|back")]]
+                    kb = [[InlineKeyboardButton(" <-- Back", callback_data="action|back")]]
                     await q.edit_message_text("Run code!", reply_markup=InlineKeyboardMarkup(kb))
                     return ConversationHandler.END
                 
@@ -175,7 +175,6 @@ async def ClikButton(update: Update, context: ContextTypes.DEFAULT_TYPE):
         case "action":
             match arg:
                 case "stop":
-                    global led_thread, stop_event
 
                     if led_thread and led_thread.is_alive() and stop_event:
                         stop_event.set()

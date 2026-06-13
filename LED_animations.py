@@ -8,11 +8,9 @@ leds = [4, 17, 18, 27, 22, 23, 24, 25, 7]
 type_list = ["ladder", "snake", "ping_pong", "static", "reverse_blink", "blink"]
 flags = ["time", "len", "type", "quantity"]
 
-GPIO.setmode(GPIO.BCM)
-
 
 def init_GPIO():
-
+    GPIO.setmode(GPIO.BCM)
     for pin in leds:
         GPIO.setup(pin, GPIO.OUT)
         GPIO.output(pin, 0)
